@@ -22,7 +22,7 @@ app.layout = dbc.Container([
                 dbc.CardHeader("Patient Data Input"),
                 dbc.CardBody([
                     html.Label("Age"),
-                    dcc.Slider(id='in-age', min=20, max=80, value=50, id='age-slider'),
+                    dcc.Slider(id='age-slider', min=20, max=80, value=50, marks={i: str(i) for i in range(20, 81, 10)}),
                     html.Label("Sex (1=Male, 0=Female)", className="mt-2"),
                     dcc.Dropdown(id='in-sex', options=[{'label': 'Male', 'value': 1}, {'label': 'Female', 'value': 0}], value=1),
                     html.Label("Cholesterol", className="mt-2"),
@@ -56,10 +56,13 @@ app.layout = dbc.Container([
 ], fluid=True)
 
 # Callback สำหรับประมวลผลทั้งหมด
+# ตรงนี้ต้องใช้ชื่อ id ให้ตรงกับที่แก้ข้างบน
 @app.callback(
     [Output('gauge-plot', 'figure'), Output('output-text', 'children'), Output('trend-plot', 'figure')],
     Input('btn-predict', 'n_clicks'),
-    [State('in-age', 'value'), State('in-sex', 'value'), State('in-chol', 'value')]
+    [State('age-slider', 'value'), 
+     State('in-sex', 'value'), 
+     State('in-chol', 'value')]
 )
 def update_dashboard(n, age, sex, chol):
     # สร้างข้อมูลจำลองให้ครบ 13 คอลัมน์ตามที่โมเดลต้องการ

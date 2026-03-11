@@ -1,27 +1,23 @@
 import pandas as pd
-import numpy as np
-from pycaret.classification import *
+from autogluon.tabular import TabularPredictor
 
-# 1. จัดการข้อมูล (Data Cleaning)
-# ระบุชื่อคอลัมน์ตาม UCI Heart Disease Dataset
-cols = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 
-        'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'target']
+# 1. Load Data
+columns = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 
+           'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'target']
+df = pd.read_csv('processed.cleveland.data', names=columns, na_values='?')
 
-# โหลดข้อมูล (สมมติว่าไฟล์อยู่ในโฟลเดอร์ data)
-df = pd.read_csv('data/processed.cleveland.data', names=cols, na_values='?')
-
-# Clean: ลบแถวที่มีค่าว่าง (2 คะแนน)
-df = df.dropna()
-
-# ปรับ Target: ให้ 0=ปกติ, 1=เสี่ยงโรค (จากเดิม 1-4 ให้เป็น 1)
+# 2. Preprocessing
+# จัดการค่าว่างด้วยค่ามัธยฐาน
+df = df.fillna(df.median())
+# ปรับ Target: 0 = ปกติ, 1-4 = มีความเสี่ยง (แปลงเป็น Binary Classification)
 df['target'] = df['target'].apply(lambda x: 1 if x > 0 else 0)
-df.to_csv('data/heart_cleaned.csv', index=False)
 
-# 2. เทรนโมเดลด้วย PyCaret (3 คะแนน)
-s = setup(data=df, target='target', session_id=123, verbose=False)
-best_model = compare_models() # ค้นหาโมเดลที่ดีที่สุด
-final_model = finalize_model(best_model)
+# 3. Train Model ด้วย AutoGluon
+print("Starting training with AutoGluon...")
+predictor = TabularPredictor(label='target', path='ag_heart_model').fit(
+    train_data=df, 
+    presets='best_quality', # เน้นแม่นยำที่สุด
+    time_limit=120          # รัน 2 นาที (ปรับเพิ่มได้ถ้ามีเวลา)
+)
 
-# บันทึกโมเดลไว้ในโฟลเดอร์ models
-save_model(final_model, 'models/heart_model')
-print("--- Training Complete: Model saved in models/heart_model.pkl ---")
+print("Training Complete! folder 'ag_heart_model' created.")

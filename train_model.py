@@ -1,26 +1,46 @@
 import pandas as pd
 from autogluon.tabular import TabularPredictor
+import os
 
-def load_and_prep(url, country_name):
+def prepare_and_train():
     columns = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 
                'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'target']
-    # โหลดข้อมูล (สมมติว่าคุณมีไฟล์ประเทศอื่นๆ ในเครื่อง หรือใช้ลิงก์ URL)
-    df = pd.read_csv(url, names=columns, na_values='?')
+    
+    # 1. โหลดข้อมูล
+    if not os.path.exists('processed.cleveland.data'):
+        print("❌ ไม่พบไฟล์ processed.cleveland.data")
+        return
+
+    df = pd.read_csv('processed.cleveland.data', names=columns, na_values='?')
     df = df.fillna(df.median())
     df['target'] = df['target'].apply(lambda x: 1 if x > 0 else 0)
-    df['country'] = country_name # เพิ่มคอลัมน์ระบุประเทศ
-    return df
+    df['country'] = 'USA'
 
-# ในที่นี้จะจำลองการแบ่งข้อมูล Cleveland เป็น 2 ประเทศเพื่อให้เห็นภาพการเปรียบเทียบ
-df_all = load_and_prep('processed.cleveland.data', 'USA')
-# จำลองข้อมูลอีกชุดเป็น Hungary (ในงานจริงคุณสามารถหาไฟล์ hungarian.data มาเพิ่มได้)
-df_hungary = df_all.sample(frac=0.5).copy()
-df_hungary['country'] = 'Hungary'
-df_hungary['chol'] = df_hungary['chol'] * 0.8 # สมมติตัวแปรต่างกัน
+    # 2. จำลองข้อมูลเปรียบเทียบ
+    df_compare = df.sample(frac=0.8, random_state=42).copy()
+    df_compare['country'] = 'Hungary'
+    
+    df_combined = pd.concat([df, df_compare], ignore_index=True)
+    df_combined.to_csv('combined_heart_data.csv', index=False)
 
-df_final = pd.concat([df_all, df_hungary])
-df_final.to_csv('combined_heart_data.csv', index=False)
+    # 3. เทรนโมเดล
+    predictor = TabularPredictor(label='target', path='ag_heart_model').fit(
+        df_combined, presets='best_quality'
+    )
+    
+    # 4. สร้างข้อมูลผลลัพธ์ (แก้ปัญหาไฟล์ว่าง)
+    test_sample = df_combined.sample(n=10, random_state=7)
+    preds = predictor.predict(test_sample.drop(columns=['target']))
+    
+    results = pd.DataFrame({
+        'Actual': test_sample['target'].values, 
+        'Predicted': preds.values
+    })
+    
+    # บันทึกไฟล์และเช็คความเรียบร้อย
+    results.to_csv('model_results.csv', index=False)
+    print(f"✅ สร้างไฟล์ model_results.csv สำเร็จ (มี {len(results)} แถว)")
+    print("🚀 ทุกอย่างพร้อมแล้ว! รัน python app.py ได้เลย")
 
-# เทรนโมเดล
-predictor = TabularPredictor(label='target', path='ag_heart_model').fit(df_final, presets='best_quality')
-print("✅ Training Complete with Multi-Country Data!")
+if __name__ == '__main__':
+    prepare_and_train()
